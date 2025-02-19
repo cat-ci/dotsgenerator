@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Vector Dots Generator</title>
+  <style>
+    /* Basic Reset */
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    /* Main container splits the canvas area and the sidebar */
+    .container {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+    /* Left canvas area */
+    .canvas-area {
+      flex: 1;
+      background: #f7f7f7;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: auto;
+    }
+    /* Right sidebar */
+    .sidebar {
+      width: 300px;
+      background: #fff;
+      border-left: 1px solid #ccc;
+      padding: 20px;
+      overflow-y: auto;
+    }
+    .sidebar h2 {
+      margin-top: 0;
+    }
+    /* Controls layout */
+    .controls {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+    .control-group {
+      display: flex;
+      flex-direction: column;
+    }
+    .control-group label {
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+    .control-group input[type="range"],
+    .control-group input[type="number"],
+    .control-group select,
+    .control-group input[type="color"] {
+      width: 100%;
+    }
+    /* Side Mode options (radio buttons) */
+    .side-mode-options label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: normal;
+    }
+    /* Button group styling */
+    .button-group {
+      display: flex;
+      gap: 10px;
+    }
+    .button-group button {
+      flex: 1;
+      padding: 10px;
+      font-size: 1em;
+      cursor: pointer;
+    }
+    /* SVG styling */
+    svg {
+      border: 1px solid #ccc;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Left side: Canvas area -->
+    <div class="canvas-area" id="svgContainer">
+      <!-- Generated SVG will appear here -->
+    </div>
+    <!-- Right side: Sidebar with controls -->
+    <div class="sidebar">
+      <h2>Options</h2>
+      <div class="controls">
+        <!-- Side Mode Selection -->
+        <div class="control-group side-mode-options">
+          <label>Side Mode:</label>
+          <label><input type="radio" name="sideMode" value="one" checked> One Side</label>
+          <label><input type="radio" name="sideMode" value="two"> Two Sides</label>
+          <label><input type="radio" name="sideMode" value="all"> All Sides</label>
+        </div>
+        <div class="control-group" id="sideOptions"></div>
+        <!-- Intensity Slider -->
+        <div class="control-group">
+          <label for="intensity">Intensity (dots per row): <span id="intensityVal">10</span></label>
+          <input type="range" id="intensity" min="2" max="50" value="10">
+        </div>
+        <!-- Row Count Slider -->
+        <div class="control-group">
+          <label for="rowCount">Length (rows): <span id="rowCountVal">5</span></label>
+          <input type="range" id="rowCount" min="1" max="20" value="5">
+        </div>
+        <!-- Angle Slider -->
+        <div class="control-group">
+          <label for="angle">Angle (degrees): <span id="angleVal">0</span></label>
+          <input type="range" id="angle" min="-90" max="90" value="0">
+        </div>
+        <!-- Offset Slider -->
+        <div class="control-group">
+          <label for="offset">Offset (per row, pixels): <span id="offsetVal">0</span></label>
+          <input type="range" id="offset" min="-50" max="50" value="0">
+        </div>
+        <!-- Opacity Slider -->
+        <div class="control-group">
+          <label for="opacity">Opacity (0 to 1): <span id="opacityVal">1</span></label>
+          <input type="range" id="opacity" min="0" max="1" step="0.01" value="1">
+        </div>
+        <!-- Canvas Size -->
+        <div class="control-group">
+          <label for="canvasWidth">Canvas Width (px):</label>
+          <input type="number" id="canvasWidth" value="500" min="100">
+        </div>
+        <div class="control-group">
+          <label for="canvasHeight">Canvas Height (px):</label>
+          <input type="number" id="canvasHeight" value="500" min="100">
+        </div>
+        <!-- Dot Color -->
+        <div class="control-group">
+          <label for="dotColor">Dot Color:</label>
+          <input type="color" id="dotColor" value="#000000">
+        </div>
+        <!-- Buttons: Generate and Download -->
+        <div class="control-group button-group">
+          <button id="generateBtn">Generate SVG</button>
+          <button id="downloadBtn" style="display:none;">Download SVG</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    // --- Update Slider Display Values ---
+    const intensitySlider = document.getElementById('intensity');
+    const intensityVal = document.getElementById('intensityVal');
+    intensitySlider.addEventListener('input', () => {
+      intensityVal.textContent = intensitySlider.value;
+    });
+
+    const rowCountSlider = document.getElementById('rowCount');
+    const rowCountVal = document.getElementById('rowCountVal');
+    rowCountSlider.addEventListener('input', () => {
+      rowCountVal.textContent = rowCountSlider.value;
+    });
+
+    const angleSlider = document.getElementById('angle');
+    const angleVal = document.getElementById('angleVal');
+    angleSlider.addEventListener('input', () => {
+      angleVal.textContent = angleSlider.value;
+    });
+
+    const offsetSlider = document.getElementById('offset');
+    const offsetVal = document.getElementById('offsetVal');
+    offsetSlider.addEventListener('input', () => {
+      offsetVal.textContent = offsetSlider.value;
+    });
+
+    const opacitySlider = document.getElementById('opacity');
+    const opacityVal = document.getElementById('opacityVal');
+    opacitySlider.addEventListener('input', () => {
+      opacityVal.textContent = opacitySlider.value;
+    });
+
+    // --- Side Mode Options ---
+    const sideModeRadios = document.querySelectorAll('input[name="sideMode"]');
+    const sideOptionsDiv = document.getElementById('sideOptions');
+
+    function updateSideOptions() {
+      const selectedMode = document.querySelector('input[name="sideMode"]:checked').value;
+      sideOptionsDiv.innerHTML = '';
+
+      if (selectedMode === 'one') {
+        const label = document.createElement('label');
+        label.textContent = "Select Side:";
+        const select = document.createElement('select');
+        select.id = 'sideSelect';
+        ['Top', 'Right', 'Bottom', 'Left'].forEach(side => {
+          const option = document.createElement('option');
+          option.value = side.toLowerCase();
+          option.textContent = side;
+          select.appendChild(option);
+        });
+        sideOptionsDiv.appendChild(label);
+        sideOptionsDiv.appendChild(select);
+      } else if (selectedMode === 'two') {
+        const label1 = document.createElement('label');
+        label1.textContent = "Select First Side:";
+        const select1 = document.createElement('select');
+        select1.id = 'sideSelect1';
+        ['Top', 'Right', 'Bottom', 'Left'].forEach(side => {
+          const option = document.createElement('option');
+          option.value = side.toLowerCase();
+          option.textContent = side;
+          select1.appendChild(option);
+        });
+        sideOptionsDiv.appendChild(label1);
+        sideOptionsDiv.appendChild(select1);
+
+        const label2 = document.createElement('label');
+        label2.textContent = "Select Second Side:";
+        const select2 = document.createElement('select');
+        select2.id = 'sideSelect2';
+        ['Top', 'Right', 'Bottom', 'Left'].forEach(side => {
+          const option = document.createElement('option');
+          option.value = side.toLowerCase();
+          option.textContent = side;
+          select2.appendChild(option);
+        });
+        sideOptionsDiv.appendChild(label2);
+        sideOptionsDiv.appendChild(select2);
+      } else if (selectedMode === 'all') {
+        sideOptionsDiv.textContent = "All sides will be used.";
+      }
+    }
+    updateSideOptions();
+    sideModeRadios.forEach(radio => {
+      radio.addEventListener('change', updateSideOptions);
+    });
+
+    // --- Helper: Rotate a Vector by theta radians ---
+    function rotateVector(v, theta) {
+      return {
+        x: v.x * Math.cos(theta) - v.y * Math.sin(theta),
+        y: v.x * Math.sin(theta) + v.y * Math.cos(theta)
+      };
+    }
+
+    // --- Generate SVG ---
+    const generateBtn = document.getElementById('generateBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const svgContainer = document.getElementById('svgContainer');
+
+    generateBtn.addEventListener('click', () => {
+      // Determine which side(s) to use
+      const selectedMode = document.querySelector('input[name="sideMode"]:checked').value;
+      let sides = [];
+      if (selectedMode === 'one') {
+        const side = document.getElementById('sideSelect').value;
+        sides.push(side);
+      } else if (selectedMode === 'two') {
+        const side1 = document.getElementById('sideSelect1').value;
+        const side2 = document.getElementById('sideSelect2').value;
+        if (side1 === side2) {
+          alert("Please select two different sides.");
+          return;
+        }
+        sides.push(side1, side2);
+      } else if (selectedMode === 'all') {
+        sides = ['top', 'right', 'bottom', 'left'];
+      }
+
+      // Retrieve slider and input values
+      const dotsPerRow = parseInt(intensitySlider.value);
+      const numRows = parseInt(rowCountSlider.value);
+      const angleDegrees = parseFloat(angleSlider.value);
+      const offsetValue = parseFloat(offsetSlider.value);
+      const dotOpacity = opacitySlider.value;
+      const dotColor = document.getElementById('dotColor').value;
+      const angleRadians = angleDegrees * Math.PI / 180;
+      
+      const canvasWidth = parseInt(document.getElementById('canvasWidth').value);
+      const canvasHeight = parseInt(document.getElementById('canvasHeight').value);
+
+      // Base dot size and spacing
+      const baseRadius = 5;
+      const minRadius = 1;
+      const rowSpacing = 20; // pixels between successive rows
+
+      // Create an SVG element
+      const svgNS = "http://www.w3.org/2000/svg";
+      const svgElem = document.createElementNS(svgNS, 'svg');
+      svgElem.setAttribute('width', canvasWidth);
+      svgElem.setAttribute('height', canvasHeight);
+      svgElem.setAttribute('xmlns', svgNS);
+
+      // Helper: add a circle with opacity
+      function addDot(cx, cy, r) {
+        const circle = document.createElementNS(svgNS, 'circle');
+        circle.setAttribute('cx', cx);
+        circle.setAttribute('cy', cy);
+        circle.setAttribute('r', r);
+        circle.setAttribute('fill', dotColor);
+        circle.setAttribute('opacity', dotOpacity);
+        svgElem.appendChild(circle);
+      }
+
+      // For each selected side, generate the dot rows
+      sides.forEach(side => {
+        let startPoints = []; // base positions along the edge
+        let baseNormal = { x: 0, y: 0 }; // direction in which rows extend
+        let baseFirst; // first dot of the base row
+        let rowAxis, rowLength; // for wrapping lateral shift
+
+        if (side === 'top') {
+          for (let j = 0; j < dotsPerRow; j++) {
+            let x = (dotsPerRow === 1) ? canvasWidth / 2 : (canvasWidth / (dotsPerRow - 1)) * j;
+            startPoints.push({ x: x, y: 0 });
+          }
+          baseNormal = { x: 0, y: 1 };
+          baseFirst = startPoints[0];
+          rowAxis = { x: 1, y: 0 };
+          rowLength = canvasWidth;
+        } else if (side === 'bottom') {
+          for (let j = 0; j < dotsPerRow; j++) {
+            let x = (dotsPerRow === 1) ? canvasWidth / 2 : (canvasWidth / (dotsPerRow - 1)) * j;
+            startPoints.push({ x: x, y: canvasHeight });
+          }
+          baseNormal = { x: 0, y: -1 };
+          baseFirst = startPoints[0];
+          rowAxis = { x: 1, y: 0 };
+          rowLength = canvasWidth;
+        } else if (side === 'left') {
+          for (let j = 0; j < dotsPerRow; j++) {
+            let y = (dotsPerRow === 1) ? canvasHeight / 2 : (canvasHeight / (dotsPerRow - 1)) * j;
+            startPoints.push({ x: 0, y: y });
+          }
+          baseNormal = { x: 1, y: 0 };
+          baseFirst = startPoints[0];
+          rowAxis = { x: 0, y: 1 };
+          rowLength = canvasHeight;
+        } else if (side === 'right') {
+          for (let j = 0; j < dotsPerRow; j++) {
+            let y = (dotsPerRow === 1) ? canvasHeight / 2 : (canvasHeight / (dotsPerRow - 1)) * j;
+            startPoints.push({ x: canvasWidth, y: y });
+          }
+          baseNormal = { x: -1, y: 0 };
+          baseFirst = startPoints[0];
+          rowAxis = { x: 0, y: 1 };
+          rowLength = canvasHeight;
+        }
+
+        // Rotate the base normal by the angle slider value
+        const offsetDir = rotateVector(baseNormal, angleRadians);
+
+        // For each row from the edge, add the main offset and lateral shift (with wrapping)
+        for (let r = 0; r < numRows; r++) {
+          const mainOffsetDistance = r * rowSpacing;
+          const lateralShift = r * offsetValue;
+          const dotRadius = (numRows === 1)
+            ? baseRadius
+            : baseRadius - ((baseRadius - minRadius) * (r / (numRows - 1)));
+
+          startPoints.forEach(pt => {
+            const relX = pt.x - baseFirst.x;
+            const relY = pt.y - baseFirst.y;
+            let posAlongRow = relX * rowAxis.x + relY * rowAxis.y;
+            let newPos = posAlongRow + lateralShift;
+            let wrappedPos = ((newPos % rowLength) + rowLength) % rowLength;
+            const wrappedBase = {
+              x: baseFirst.x + wrappedPos * rowAxis.x,
+              y: baseFirst.y + wrappedPos * rowAxis.y
+            };
+            const finalX = wrappedBase.x + mainOffsetDistance * offsetDir.x;
+            const finalY = wrappedBase.y + mainOffsetDistance * offsetDir.y;
+            addDot(finalX, finalY, dotRadius);
+          });
+        }
+      });
+
+      // Display the SVG
+      svgContainer.innerHTML = '';
+      svgContainer.appendChild(svgElem);
+
+      // Serialize the SVG for download
+      const serializer = new XMLSerializer();
+      let svgString = serializer.serializeToString(svgElem);
+      svgString = '<?xml version="1.0" standalone="no"?>\n' + svgString;
+      const blob = new Blob([svgString], { type: 'image/svg+xml' });
+      const url = URL.createObjectURL(blob);
+      
+      downloadBtn.style.display = 'inline-block';
+      downloadBtn.onclick = function() {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'vector_dots.svg';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      };
+    });
+  </script>
+</body>
+</html>
